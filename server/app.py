@@ -14,13 +14,73 @@ migrate = Migrate(app, db)
 
 db.init_app(app)
 
-@app.route('/messages')
+@app.route('/messages', methods=['GET', 'POST'])
 def messages():
-    return ''
+    if request.method == 'GET':
+        messages = Message.query.order_by(Message.created_at.asc()).all()
+        messages_list = [message.to_dict() for message in messages]
+        return jsonify(messages_list), 200
 
-@app.route('/messages/<int:id>')
+    elif request.method == 'POST':
+        new_message = Message(
+            body = request.form.get("body"),
+            username= request.form.get("username"),
+        )
+        db.session.add(new_message)
+        db.session.commit()
+
+        message_dict = new_message.to_dict()
+
+        return jsonify(message_dict), 201
+
+
+@app.route('/messages/<int:id>', methods=['GET', 'PATCH', 'DELETE'])
 def messages_by_id(id):
-    return ''
+    message = Message.query.filter(Message.id == id).first()
+
+    if message == None:
+        response_body = {
+            "message":"This record does not exist in our database"
+        }
+        response = make_response(response_body, 404)
+        return response
+
+    else:
+        message_dict = message.to_dict()
+        
+        if request.method == 'GET':
+            message_dict = message.to_dict()
+            response = make_response(
+                message_dict,
+                200
+                )
+            return response
+        elif request.method == 'PATCH':
+            for attr in request.form:
+                setattr(message, attr, request.form.get(attr))
+
+            db.session.add(message)
+            db.session.commit()
+            return jsonify(message_dict), 201
+
+        elif request.method == 'DELETE':
+
+            db.session.delete(message)
+            db.session.commit()
+
+            response_body = {
+                "delete_successful": True,
+                "message": "Review deleted."
+            }
+
+            response = make_response(
+                response_body,
+                200
+            )
+
+            return response
+
+
 
 if __name__ == '__main__':
     app.run(port=5555)
